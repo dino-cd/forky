@@ -27,6 +27,7 @@ const browserPasteSolution = typeof navigator.clipboard.readText === "function";
 const browserCopySolution = typeof navigator.clipboard.write === "function";
 let copyButton = 0; // Hack to make copying work on Safari.
 const isMobile = isTouchDevice();
+let randomMode = false;
 
 // offscreen canvases
 let osc1, osctx1;
@@ -7022,6 +7023,7 @@ function drawExploreLevel(x, y, i, levelType, pageType) {
 
 function setExplorePage(page) {
 	explorePage = page;
+	randomMode = false;
 	exploreLevelTitlesTruncated = new Array(8); // Is this needed?
 	if (exploreTab == 2) getSearchPage(exploreSearchInput, page);
 	else getExplorePage(explorePage, exploreTab, exploreSort);
@@ -9713,7 +9715,11 @@ function draw() {
 				ctx.stroke();
 			}
 
-			if (exploreTab != 2) { // Sort and pages aren't supported for search yet
+			// Sort and pages aren't supported for search yet
+			// from Zelo: they are now!
+			if (exploreTab != 2) { 
+				// the gap between buttons is 7
+				
 				ctx.beginPath();
 				// Sort by
 				if (onRect(_xmouse, _ymouse, 565, 85, exploreSortTextWidth+30, 30)) {
@@ -9728,7 +9734,7 @@ function draw() {
 				ctx.fill();
 				
 				ctx.beginPath();
-				if (onRect(_xmouse, _ymouse, 902-exploreSortTextWidth, 85, exploreSortTextWidth+10, 30)) {
+				if (onRect(_xmouse, _ymouse, 902-exploreSortTextWidth, 85, exploreSortTextWidth, 30)) {
 					ctx.fillStyle = '#404040';
 					onButton = true;
 					if (mouseIsDown && !pmouseIsDown) {
@@ -9738,22 +9744,57 @@ function draw() {
 					}
 				} else ctx.fillStyle = '#333333';
 				ctx.roundRect(902-exploreSortTextWidth, 85, exploreSortTextWidth+30, 30, 5);
-
 				ctx.fill();
+
+				ctx.beginPath();
+
+				// Random Die
+				const exploreRandomDieX = 528;
+				const exploreRandomDieY = 85;
+				const dieDimpleSize = 3;
+				if (onRect(_xmouse, _ymouse, exploreRandomDieX, exploreRandomDieY, 30, 30)) {
+					ctx.fillStyle = randomMode ? '#002aff' : '#404040';
+					onButton = true;
+					if (mouseIsDown && !pmouseIsDown) {
+						randomMode = true;
+						getRandomLevels()
+					}
+				} else ctx.fillStyle = randomMode ? '#001ba0' : '#333333';
+				ctx.roundRect(exploreRandomDieX, exploreRandomDieY, 30, 30, 5);
+				ctx.fill();
+				ctx.fillStyle = '#ffffff';
+				ctx.beginPath();
+				ctx.arc(exploreRandomDieX + 6, exploreRandomDieY + 6, dieDimpleSize, 0, Math.PI * 2, false);
+				ctx.fill();
+				ctx.beginPath();
+				ctx.fill();
+				ctx.beginPath();
+				ctx.arc(exploreRandomDieX + 24, exploreRandomDieY + 6, dieDimpleSize, 0, Math.PI * 2, false);
+				ctx.fill();
+				ctx.beginPath();
+				ctx.arc(exploreRandomDieX + 15, exploreRandomDieY + 15, dieDimpleSize, 0, Math.PI * 2, false);
+				ctx.fill();
+				ctx.beginPath();
+				ctx.arc(exploreRandomDieX + 6, exploreRandomDieY + 24, dieDimpleSize, 0, Math.PI * 2, false);
+				ctx.fill();
+				ctx.beginPath();
+				ctx.arc(exploreRandomDieX + 24, exploreRandomDieY + 24, dieDimpleSize, 0, Math.PI * 2, false);
+				ctx.fill();
+
 				ctx.textBaseline = 'top';
-				ctx.textAlign = 'left';
+				ctx.textAlign = 'center';
 				ctx.fillStyle = '#ffffff';
 				ctx.font = '24px Helvetica';
 
 				let sortingText = exploreSortText[exploreSort][0].toLocaleUpperCase() + exploreSortText[exploreSort].slice(1)
-				ctx.fillText(sortingText, 570, 88);
-				ctx.fillText('Play the Daily!', 902-exploreSortTextWidth + 5, 88);
+				ctx.fillText(sortingText, 650, 88);
+				ctx.fillText('Play the Daily!', 992-exploreSortTextWidth + 5, 88);
 			}
 			// Page number
 			ctx.fillStyle = '#ffffff';
 			ctx.textAlign = 'center';
 			ctx.font = '30px Helvetica';
-			ctx.fillText(explorePage, cwidth / 2, 490);
+			ctx.fillText(randomMode ? "random" : explorePage, cwidth / 2, 490);
 
 			// Previous page button
 			if (explorePage <= 1 || exploreLoading) ctx.fillStyle = '#505050';
@@ -10725,6 +10766,22 @@ function getExploreUserPage(id, p, t, s) {
 			exploreUserPageLevels[t] = await response.json();
 			if (t === 0) setExploreThumbsUserPage(t);
 			truncateLevelTitles(exploreUserPageLevels[t],t*4);
+			requestResolved();
+		})
+		.catch(err => {
+			console.log(err);
+			requestError();
+		});
+}
+
+function getRandomLevels() {
+	requestAdded();
+	let url = "https://5beam.zelo.dev/api/page/random"
+	return fetch(url + '?type=' + exploreTab, {method: 'GET'})
+		.then(async response => {
+			explorePageLevels = await response.json();
+			if (exploreTab == 0) setExploreThumbs();
+			truncateLevelTitles(explorePageLevels,0);
 			requestResolved();
 		})
 		.catch(err => {
