@@ -10607,6 +10607,17 @@ let interval = 1000 / fps;
 let delta;
 
 function rAF60fps() {
+// Reference your slider and display
+const slider = document.getElementById('ssslider');
+const sslider = document.getElementById('sssval');
+
+slider.addEventListener('input', function() {
+    allxspeed = parseFloat(this.value);
+    sslider.textContent = this.value;
+    for (let i = 0; i < charD.length; i++) {
+        charD[i][4] = allxspeed;
+    }
+});
 	requestAnimationFrame(rAF60fps);
 	if (frameRateThrottling) {
 		now = window.performance.now();
