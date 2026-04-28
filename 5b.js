@@ -1,4 +1,3 @@
-
 /* For testing the performance of any block of code. It averages every 100 runs and prints to the console. To use, simply place the following around the code block you'd like to test:
 performanceTest(()=>{
 }); */
@@ -110,8 +109,9 @@ let lcSavedLevelpacks;
 let nextLevelpackId;
 let whiteAlpha = 0;
 let coinAlpha = 0;
-let searchParams = new URLSearchParams(window.location.href);
+let searchParams = new URLSearchParams(window.location.search);
 let [levelId, levelpackId] = [searchParams.get("https://coppersalts.github.io/HTML5b/?level"), searchParams.get("https://coppersalts.github.io/HTML5b/?levelpack")]
+let lvParam = searchParams.get("lv");
 const difficultyMap = [
 	["Unknown", "#e6e6e6"],
 	["Easy", "#85ff85"],
@@ -644,6 +644,21 @@ const blockProperties = [
 	[false,false,false,false,false,false,false,false,true,false,false,0,2,false,false,true,1,false],
 ];
 const switches = [[31,33,32,34,79,78,81,82],[51,53,52,54,133,134],[65,61,60,62,63,64],[],[],[14,16,83,85]];
+
+const unknownCharToTileId = new Map();
+const unknownTileIdToColor = new Map();
+function _seededColor(seed) {
+	let h = (seed * 137.508) % 360;
+	return 'hsl(' + h.toFixed(0) + ',80%,55%)';
+}
+function getOrCreateUnknownTileId(charCode) {
+	if (unknownCharToTileId.has(charCode)) return unknownCharToTileId.get(charCode);
+	const newId = blockProperties.length;
+	blockProperties.push([true,true,true,true,false,false,false,false,false,false,false,0,0,false,false,true,0,false]);
+	unknownTileIdToColor.set(newId, _seededColor(charCode));
+	unknownCharToTileId.set(charCode, newId);
+	return newId;
+}
 
 // [0] - hitbox width
 // [1] - hitbox height
@@ -3504,7 +3519,8 @@ function copyLevel(thatLevel) {
 		tileBorders[y] = new Array(thatLevel[y].length);
 		for (let x = 0; x < levelWidth; x++) {
 			thisLevel[y][x] = thatLevel[y][x];
-			let sw = Math.ceil(blockProperties[thisLevel[y][x]][11] / 6);
+			let bp = blockProperties[thisLevel[y][x]];
+			let sw = bp ? Math.ceil(bp[11] / 6) : 0;
 			tileFrames[y][x] = {cf: 0, playing: false, rotation: sw == 1 ? -60 : sw == 2 ? 60 : 0};
 			tileShadows[y][x] = [];
 			tileBorders[y][x] = [];
@@ -4122,6 +4138,20 @@ function getTileDepths() {
 // TODO: precalculate a this stuff and only do the drawing in here. Unless it's actually all necessary. Then you can just leave it.
 function addTileMovieClip(x, y, context) {
 	let t = thisLevel[y][x];
+	// Draw placeholder for unknown/unrecognized tile IDs
+	if (unknownTileIdToColor.has(t)) {
+		let color = unknownTileIdToColor.get(t);
+		context.fillStyle = color;
+		context.fillRect(x * 30, y * 30, 30, 30);
+		context.fillStyle = 'rgba(0,0,0,0.45)';
+		context.fillRect(x * 30, y * 30, 30, 30);
+		context.font = 'bold 11px monospace';
+		context.textAlign = 'center';
+		context.textBaseline = 'middle';
+		context.fillStyle = '#ffffff';
+		context.fillText('?', x * 30 + 15, y * 30 + 15);
+		return;
+	}
 	if (blockProperties[t][16] > 0) {
 		if (blockProperties[t][16] == 1) {
 			if (blockProperties[t][11] > 0 && typeof svgLevers[(blockProperties[t][11] - 1) % 6] !== 'undefined') {
@@ -6550,7 +6580,8 @@ function readLevelString(str) {
 					myLevel[1][y][x] =
 						111 * tileIDFromChar(lines[i + y].charCodeAt(x * 2)) +
 						tileIDFromChar(lines[i + y].charCodeAt(x * 2 + 1));
-					if (myLevel[1][y][x] > blockProperties.length || myLevel[1][y][x] < 0) myLevel[1][y][x] = 0;
+					if (myLevel[1][y][x] >= blockProperties.length || myLevel[1][y][x] < 0)
+						myLevel[1][y][x] = getOrCreateUnknownTileId(lines[i + y].charCodeAt(x * 2) * 65536 + lines[i + y].charCodeAt(x * 2 + 1));
 				}
 			}
 		}
@@ -6562,7 +6593,8 @@ function readLevelString(str) {
 					myLevel[1][y][x] = 0;
 				} else {
 					myLevel[1][y][x] = tileIDFromChar(lines[i + y].charCodeAt(x));
-					if (myLevel[1][y][x] > blockProperties.length || myLevel[1][y][x] < 0) myLevel[1][y][x] = 0;
+					if (myLevel[1][y][x] >= blockProperties.length || myLevel[1][y][x] < 0)
+						myLevel[1][y][x] = getOrCreateUnknownTileId(lines[i + y].charCodeAt(x));
 				}
 			}
 		}
@@ -6738,7 +6770,8 @@ function readExploreLevelString(str) {
 					myLevel[1][y][x] =
 						111 * tileIDFromChar(lines[i + y].charCodeAt(x * 2)) +
 						tileIDFromChar(lines[i + y].charCodeAt(x * 2 + 1));
-					if (myLevel[1][y][x] > blockProperties.length || myLevel[1][y][x] < 0) myLevel[1][y][x] = 0;
+					if (myLevel[1][y][x] >= blockProperties.length || myLevel[1][y][x] < 0)
+						myLevel[1][y][x] = getOrCreateUnknownTileId(lines[i + y].charCodeAt(x * 2) * 65536 + lines[i + y].charCodeAt(x * 2 + 1));
 				}
 			}
 		}
@@ -6750,7 +6783,8 @@ function readExploreLevelString(str) {
 					myLevel[1][y][x] = 0;
 				} else {
 					myLevel[1][y][x] = tileIDFromChar(lines[i + y].charCodeAt(x));
-					if (myLevel[1][y][x] > blockProperties.length || myLevel[1][y][x] < 0) myLevel[1][y][x] = 0;
+					if (myLevel[1][y][x] >= blockProperties.length || myLevel[1][y][x] < 0)
+						myLevel[1][y][x] = getOrCreateUnknownTileId(lines[i + y].charCodeAt(x));
 				}
 			}
 		}
@@ -7750,8 +7784,13 @@ function setup() {
 
 	if (localStorage.getItem("5beam_id")) loggedInExploreUser5beamID = localStorage.getItem("5beam_id");
 
-	if (levelId) {
-		// If the level ID is specified in the URL, load that level.
+	if (lvParam) {
+		readExploreLevelString(lvParam);
+		testLevelCreator();
+		playingLevelpack = false;
+		playMode = 3;
+		rAF60fps();
+	} else if (levelId) {\
 		menuScreen = 0;
 		exploreLevelPageType = 0;
 		fetch('https://5beam.zelo.dev/api/level?id=' + levelId, {method: 'GET'})
@@ -7765,7 +7804,6 @@ function setup() {
 				console.error(e);
 			});
 	} else if (levelpackId) {
-		// If the levelpack ID is specified in the URL, load that levelpack.
 		menuScreen = 1;
 		exploreLevelPageType = 1;
 		fetch('https://5beam.zelo.dev/api/levelpack?levels=1&id=' + levelpackId, {method: 'GET'})
