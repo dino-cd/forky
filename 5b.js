@@ -2297,11 +2297,8 @@ async function loadCustomTiles() {
 		}
 		const newId = blockProperties.length;
 		blockProperties.push(row);
-		img.width  = 30 * scaleFactor;
-		img.height = 30 * scaleFactor;
-
 		svgTiles[newId] = img;
-		svgTilesVB[newId] = [0, 0, 30, 30];
+		svgTilesVB[newId] = [0, 0, img.naturalWidth, img.naturalHeight];
 		tileNames[newId] = imgName.replace(/\.[^.]+$/, '');
 
 		console.log(`Custom tile loader: registered "${tileNames[newId]}" as tile ID ${newId}`);
@@ -4136,7 +4133,7 @@ function addTileMovieClip(x, y, context) {
 			}
 			// context.fillStyle = '#cc33ff';
 			// context.fillRect(x*30, y*30, 30, 30);
-			context.drawImage(svgTiles[t], x * 30 + svgTilesVB[t][0], y * 30 + svgTilesVB[t][1], svgTiles[t].width / scaleFactor, svgTiles[t].height / scaleFactor);
+			context.drawImage(svgTiles[t], x * 30 + svgTilesVB[t][0], y * 30 + svgTilesVB[t][1], 30, 30);
 		} else if (blockProperties[t][16] > 1) {
 			let frame = 0;
 			if (blockProperties[t][17]) frame = blockProperties[t][18][_frameCount % blockProperties[t][18].length];
