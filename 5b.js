@@ -1,4 +1,10 @@
-
+await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct-js.min.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+});
 /* For testing the performance of any block of code. It averages every 100 runs and prints to the console. To use, simply place the following around the code block you'd like to test:
 performanceTest(()=>{
 }); */
@@ -2297,8 +2303,36 @@ async function loadCustomTiles() {
 		}
 		const newId = blockProperties.length;
 		blockProperties.push(row);
-		svgTiles[newId] = img;
-		svgTilesVB[newId] = [0, 0, img.naturalWidth, img.naturalHeight];
+if (imgName.match(/\.gif$/i)) {
+    const response = await fetch(CUSTOM_TILE_REPO_BASE + imgName);
+    const buffer = await response.arrayBuffer();
+    const gif = parseGIF(buffer);
+    const frames = decompressFrames(gif, true);
+    const frameCanvases = frames.map(frame => {
+        const fc = document.createElement('canvas');
+        fc.width  = 30 * scaleFactor;
+        fc.height = 30 * scaleFactor;
+        const fctx = fc.getContext('2d');
+        const imageData = new ImageData(new Uint8ClampedArray(frame.patch), frame.dims.width, frame.dims.height);
+        const tmp = document.createElement('canvas');
+        tmp.width  = frame.dims.width;
+        tmp.height = frame.dims.height;
+        tmp.getContext('2d').putImageData(imageData, 0, 0);
+        fctx.drawImage(tmp, frame.dims.left, frame.dims.top, frame.dims.width, frame.dims.height, 0, 0, fc.width, fc.height);
+        return fc;
+    });
+    svgTiles[newId] = frameCanvases;
+    blockProperties[newId][16] = frameCanvases.length; // animated
+    blockProperties[newId][17] = true;                 // loop
+    blockProperties[newId][18] = frameCanvases.map((_, i) => i); // frame order
+} else {
+    const tileCanvas = document.createElement('canvas');
+    tileCanvas.width  = 30 * scaleFactor;
+    tileCanvas.height = 30 * scaleFactor;
+    tileCanvas.getContext('2d').drawImage(img, 0, 0, tileCanvas.width, tileCanvas.height);
+    svgTiles[newId] = tileCanvas;
+}
+svgTilesVB[newId] = [0, 0, 30, 30];
 		tileNames[newId] = imgName.replace(/\.[^.]+$/, '');
 
 		console.log(`Custom tile loader: registered "${tileNames[newId]}" as tile ID ${newId}`);
