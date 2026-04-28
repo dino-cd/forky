@@ -7790,7 +7790,7 @@ function setup() {
 		playingLevelpack = false;
 		playMode = 3;
 		rAF60fps();
-	} else if (levelId) {\
+	} else if (levelId) {
 		menuScreen = 0;
 		exploreLevelPageType = 0;
 		fetch('https://5beam.zelo.dev/api/level?id=' + levelId, {method: 'GET'})
