@@ -2297,12 +2297,10 @@ async function loadCustomTiles() {
 		}
 		const newId = blockProperties.length;
 		blockProperties.push(row);
-		const tileCanvas = document.createElement('canvas');
-		tileCanvas.width  = 30 * scaleFactor;
-		tileCanvas.height = 30 * scaleFactor;
-		tileCanvas.getContext('2d').drawImage(img, 0, 0, tileCanvas.width, tileCanvas.height);
+		img.width  = 30 * scaleFactor;
+		img.height = 30 * scaleFactor;
 
-		svgTiles[newId]   = tileCanvas;
+		svgTiles[newId] = img;
 		svgTilesVB[newId] = [0, 0, 30, 30];
 		tileNames[newId] = imgName.replace(/\.[^.]+$/, '');
 
