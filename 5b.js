@@ -1,10 +1,4 @@
-await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct-js.min.js';
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-});
+
 /* For testing the performance of any block of code. It averages every 100 runs and prints to the console. To use, simply place the following around the code block you'd like to test:
 performanceTest(()=>{
 }); */
@@ -2242,6 +2236,13 @@ function getPixelRatio(quality) {
 const CUSTOM_TILE_REPO_BASE = 'https://raw.githubusercontent.com/dino-cd/bfdia5b-public/main/';
 
 async function loadCustomTiles() {
+	await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct-js.min.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+});
 	let txt;
 	try {
 		const res = await fetch(CUSTOM_TILE_REPO_BASE + 'tileProperties.txt');
