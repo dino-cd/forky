@@ -7800,6 +7800,7 @@ function setup() {
 			.then(async (res) => {
 				exploreLevelPageLevel = await res.json();
 				playExploreLevel();
+				await loadCustomTiles();
 				rAF60fps();
 			})
 			.catch((e) => {
@@ -7815,6 +7816,7 @@ function setup() {
 				exploreLevelPageLevel = await res.json();
 				if (levelpackProgress[exploreLevelPageLevel.id] === undefined) playExploreLevel();
 				else continueExploreLevelpack();
+				await loadCustomTiles();
 				rAF60fps();
 			})
 			.catch((e) => {
@@ -7822,6 +7824,7 @@ function setup() {
 				console.error(e);
 			});
 	} else {
+		await loadCustomTiles();
 		rAF60fps();
 	}
 }
