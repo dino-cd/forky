@@ -2236,13 +2236,34 @@ function getPixelRatio(quality) {
 const CUSTOM_TILE_REPO_BASE = 'https://raw.githubusercontent.com/dino-cd/bfdia5b-public/main/';
 
 async function loadCustomTiles() {
-	await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct-js.min.js';
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-});
+async function extractGifFrames(url) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(blob);
+    await new Promise(r => img.onload = r);
+    if (typeof ImageDecoder !== 'undefined') {
+        const decoder = new ImageDecoder({ data: await blob.arrayBuffer(), type: 'image/gif' });
+        await decoder.tracks.ready;
+        const frameCount = decoder.tracks.selectedTrack.frameCount;
+        const frames = [];
+        for (let f = 0; f < frameCount; f++) {
+            const { image } = await decoder.decode({ frameIndex: f });
+            const fc = document.createElement('canvas');
+            fc.width = 30 * scaleFactor;
+            fc.height = 30 * scaleFactor;
+            fc.getContext('2d').drawImage(image, 0, 0, fc.width, fc.height);
+            frames.push(fc);
+        }
+        return frames;
+    } else {
+        const fc = document.createElement('canvas');
+        fc.width = 30 * scaleFactor;
+        fc.height = 30 * scaleFactor;
+        fc.getContext('2d').drawImage(img, 0, 0, fc.width, fc.height);
+        return [fc];
+    }
+}
 	let txt;
 	try {
 		const res = await fetch(CUSTOM_TILE_REPO_BASE + 'tileProperties.txt');
@@ -2304,24 +2325,11 @@ async function loadCustomTiles() {
 		}
 		const newId = blockProperties.length;
 		blockProperties.push(row);
-if (imgName.match(/\.gif$/i)) {
-    const response = await fetch(CUSTOM_TILE_REPO_BASE + imgName);
-    const buffer = await response.arrayBuffer();
-    const gif = parseGIF(buffer);
-    const frames = decompressFrames(gif, true);
-    const frameCanvases = frames.map(frame => {
-        const fc = document.createElement('canvas');
-        fc.width  = 30 * scaleFactor;
-        fc.height = 30 * scaleFactor;
-        const fctx = fc.getContext('2d');
-        const imageData = new ImageData(new Uint8ClampedArray(frame.patch), frame.dims.width, frame.dims.height);
-        const tmp = document.createElement('canvas');
-        tmp.width  = frame.dims.width;
-        tmp.height = frame.dims.height;
-        tmp.getContext('2d').putImageData(imageData, 0, 0);
-        fctx.drawImage(tmp, frame.dims.left, frame.dims.top, frame.dims.width, frame.dims.height, 0, 0, fc.width, fc.height);
-        return fc;
-    });
+const frames = await extractGifFrames(CUSTOM_TILE_REPO_BASE + imgName);
+svgTiles[newId] = frames;
+blockProperties[newId][16] = frames.length;
+blockProperties[newId][17] = true;
+blockProperties[newId][18] = frames.map((_, i) => i);
     svgTiles[newId] = frameCanvases;
     blockProperties[newId][16] = frameCanvases.length; // animated
     blockProperties[newId][17] = true;                 // loop
