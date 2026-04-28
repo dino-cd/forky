@@ -2236,120 +2236,78 @@ function getPixelRatio(quality) {
 const CUSTOM_TILE_REPO_BASE = 'https://raw.githubusercontent.com/dino-cd/bfdia5b-public/main/';
 
 async function loadCustomTiles() {
-    async function extractGifFrames(url) {
-        const res = await fetch(url);
-        const blob = await res.blob();
-        const img = document.createElement('img');
-        img.src = URL.createObjectURL(blob);
-        await new Promise(r => img.onload = r);
-        
-        if (typeof ImageDecoder !== 'undefined') {
-            const decoder = new ImageDecoder({ data: await blob.arrayBuffer(), type: 'image/gif' });
-            await decoder.tracks.ready;
-            const frameCount = decoder.tracks.selectedTrack.frameCount;
-            const frames = [];
-            for (let f = 0; f < frameCount; f++) {
-                const { image } = await decoder.decode({ frameIndex: f });
-                const fc = document.createElement('canvas');
-                fc.width = 30 * scaleFactor;
-                fc.height = 30 * scaleFactor;
-                fc.getContext('2d').drawImage(image, 0, 0, fc.width, fc.height);
-                frames.push(fc);
-            }
-            return frames;
-        } else {
-            const fc = document.createElement('canvas');
-            fc.width = 30 * scaleFactor;
-            fc.height = 30 * scaleFactor;
-            fc.getContext('2d').drawImage(img, 0, 0, fc.width, fc.height);
-            return [fc];
-        }
-    }
+	let txt;
+	try {
+		const res = await fetch(CUSTOM_TILE_REPO_BASE + 'tileProperties.txt');
+		if (!res.ok) return; // skip
+		txt = await res.text();
+	} catch (e) {
+		console.warn('Custom tile loader: could not fetch tileProperties.txt', e);
+		return;
+	}
 
-    let txt;
-    try {
-        const res = await fetch(CUSTOM_TILE_REPO_BASE + 'tileProperties.txt');
-        if (!res.ok) return; // skip
-        txt = await res.text();
-    } catch (e) {
-        console.warn('Custom tile loader: could not fetch tileProperties.txt', e);
-        return;
-    }
+	const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-    const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+	for (const line of lines) {
+		const match = line.match(/^([^,\[]+),\[([^\]]*)\],\[([^\]]*)\],\[([^\]]*)\]/);
+		if (!match) {
+			console.warn('Custom tile loader: could not parse line:', line);
+			continue;
+		}
 
-    for (const line of lines) {
-        const match = line.match(/^([^,\[]+),\[([^\]]*)\],\[([^\]]*)\],\[([^\]]*)\]/);
-        if (!match) {
-            console.warn('Custom tile loader: could not parse line:', line);
-            continue;
-        }
+		const imgName   = match[1].trim();
+		const parseBools = str => str.split(',').map(s => s.trim() === 'true');
 
-        const imgName    = match[1].trim();
-        const parseBools = str => str.split(',').map(s => s.trim() === 'true');
+		const solidProps   = parseBools(match[2]); // [solidU, solidD, solidL, solidR]
+		const deadlyProps  = parseBools(match[3]); // [deadlyU, deadlyD, deadlyL, deadlyR]
+		const extraProps   = parseBools(match[4]); // [makeBorder, swimmable, large, shadableBg]
+		const row = [
+			solidProps[0]  ?? false, // [0]  collide down   (solidU)
+			solidProps[1]  ?? false, // [1]  collide up     (solidD)
+			solidProps[2]  ?? false, // [2]  collide right  (solidL)
+			solidProps[3]  ?? false, // [3]  collide left   (solidR)
+			deadlyProps[0] ?? false, // [4]  hurts down     (deadlyU)
+			deadlyProps[1] ?? false, // [5]  hurts up       (deadlyD)
+			deadlyProps[2] ?? false, // [6]  hurts right    (deadlyL)
+			deadlyProps[3] ?? false, // [7]  hurts left     (deadlyR)
+			false,                   // [8]  uses movieclip
+			false,                   // [9]  fill not allowed
+			extraProps[3]  ?? false, // [10] uses shadows   (shadableBg)
+			0,                       // [11] switches for
+			0,                       // [12] switched by
+			extraProps[0]  ?? false, // [13] uses borders   (makeBorder)
+			extraProps[1]  ?? false, // [14] is liquid      (swimmable)
+			true,                    // [15] available in LC
+			1,                       // [16] animation frames (static)
+			false,                   // [17] loop?
+		];
+		let img;
+		try {
+			const imgUrl = CUSTOM_TILE_REPO_BASE + imgName;
+			img = await new Promise((resolve, reject) => {
+				const i = new Image();
+				i.crossOrigin = 'anonymous';
+				i.onload = () => resolve(i);
+				i.onerror = reject;
+				i.src = imgUrl;
+			});
+		} catch (e) {
+			console.warn('Custom tile loader: could not load image', imgName, e);
+			continue;
+		}
+		const newId = blockProperties.length;
+		blockProperties.push(row);
+		const tileCanvas = document.createElement('canvas');
+		tileCanvas.width  = 30 * scaleFactor;
+		tileCanvas.height = 30 * scaleFactor;
+		tileCanvas.getContext('2d').drawImage(img, 0, 0, tileCanvas.width, tileCanvas.height);
 
-        const solidProps   = parseBools(match[2]); // [solidU, solidD, solidL, solidR]
-        const deadlyProps  = parseBools(match[3]); // [deadlyU, deadlyD, deadlyL, deadlyR]
-        const extraProps   = parseBools(match[4]); // [makeBorder, swimmable, large, shadableBg]
-        const row = [
-            solidProps[0]  ?? false, // [0]  collide down   (solidU)
-            solidProps[1]  ?? false, // [1]  collide up     (solidD)
-            solidProps[2]  ?? false, // [2]  collide right  (solidL)
-            solidProps[3]  ?? false, // [3]  collide left   (solidR)
-            deadlyProps[0] ?? false, // [4]  hurts down     (deadlyU)
-            deadlyProps[1] ?? false, // [5]  hurts up       (deadlyD)
-            deadlyProps[2] ?? false, // [6]  hurts right    (deadlyL)
-            deadlyProps[3] ?? false, // [7]  hurts left     (deadlyR)
-            false,                   // [8]  uses movieclip
-            false,                   // [9]  fill not allowed
-            extraProps[3]  ?? false, // [10] uses shadows   (shadableBg)
-            0,                       // [11] switches for
-            0,                       // [12] switched by
-            extraProps[0]  ?? false, // [13] uses borders   (makeBorder)
-            extraProps[1]  ?? false, // [14] is liquid      (swimmable)
-            true,                    // [15] available in LC
-            1,                       // [16] animation frames (static)
-            false,                   // [17] loop?
-        ];
+		svgTiles[newId]   = tileCanvas;
+		svgTilesVB[newId] = [0, 0, 30, 30];
+		tileNames[newId] = imgName.replace(/\.[^.]+$/, '');
 
-        const imgUrl = CUSTOM_TILE_REPO_BASE + imgName;
-        const newId = blockProperties.length;
-        blockProperties.push(row);
-
-        // REPAIR: Proper if/else routing based on file extension
-        if (imgName.toLowerCase().endsWith('.gif')) {
-            const frames = await extractGifFrames(imgUrl);
-            svgTiles[newId] = frames;
-            blockProperties[newId][16] = frames.length; // animated
-            blockProperties[newId][17] = true;          // loop
-            blockProperties[newId][18] = frames.map((_, i) => i); // frame order
-        } else {
-            let img;
-            try {
-                img = await new Promise((resolve, reject) => {
-                    const i = new Image();
-                    i.crossOrigin = 'anonymous';
-                    i.onload = () => resolve(i);
-                    i.onerror = reject;
-                    i.src = imgUrl;
-                });
-            } catch (e) {
-                console.warn('Custom tile loader: could not load image', imgName, e);
-                continue;
-            }
-
-            const tileCanvas = document.createElement('canvas');
-            tileCanvas.width  = 30 * scaleFactor;
-            tileCanvas.height = 30 * scaleFactor;
-            tileCanvas.getContext('2d').drawImage(img, 0, 0, tileCanvas.width, tileCanvas.height);
-            svgTiles[newId] = tileCanvas;
-        }
-
-        svgTilesVB[newId] = [0, 0, 30, 30];
-        tileNames[newId] = imgName.replace(/\.[^.]+$/, '');
-
-        console.log(`Custom tile loader: registered "${tileNames[newId]}" as tile ID ${newId}`);
-    }
+		console.log(`Custom tile loader: registered "${tileNames[newId]}" as tile ID ${newId}`);
+	}
 }
 async function loadingScreen() {
 	pixelRatio = getPixelRatio(0);
@@ -4180,7 +4138,7 @@ function addTileMovieClip(x, y, context) {
 			}
 			// context.fillStyle = '#cc33ff';
 			// context.fillRect(x*30, y*30, 30, 30);
-			context.drawImage(svgTiles[t], x * 30 + svgTilesVB[t][0], y * 30 + svgTilesVB[t][1], 30, 30);
+			context.drawImage(svgTiles[t], x * 30 + svgTilesVB[t][0], y * 30 + svgTilesVB[t][1], svgTiles[t].width / scaleFactor, svgTiles[t].height / scaleFactor);
 		} else if (blockProperties[t][16] > 1) {
 			let frame = 0;
 			if (blockProperties[t][17]) frame = blockProperties[t][18][_frameCount % blockProperties[t][18].length];
@@ -7800,7 +7758,6 @@ function setup() {
 			.then(async (res) => {
 				exploreLevelPageLevel = await res.json();
 				playExploreLevel();
-				await loadCustomTiles();
 				rAF60fps();
 			})
 			.catch((e) => {
@@ -7816,7 +7773,6 @@ function setup() {
 				exploreLevelPageLevel = await res.json();
 				if (levelpackProgress[exploreLevelPageLevel.id] === undefined) playExploreLevel();
 				else continueExploreLevelpack();
-				await loadCustomTiles();
 				rAF60fps();
 			})
 			.catch((e) => {
@@ -7824,7 +7780,6 @@ function setup() {
 				console.error(e);
 			});
 	} else {
-		await loadCustomTiles();
 		rAF60fps();
 	}
 }
