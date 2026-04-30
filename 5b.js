@@ -68,7 +68,7 @@ let levelWidth = 0;
 let levelHeight = 0;
 let thisLevel = [];
 let tileFrames = [];
-let waterGrid = []; // water physics: float 0-4 per cell (sub-tile units)
+let waterGrid = [];
 const switchable = new Array(6);
 let charCount = 0;
 let charCount2 = 0;
@@ -3561,16 +3561,15 @@ function drawLevelBG() {
 		(bgScale / 100) * cheight
 	);
 }
-const WATER_MAX = 4;         // units in a full cell
-const WATER_FLOW = 0.45;     // max units transferred per step per direction
-const WATER_MIN = 0.02;      // evaporate rounding noise below this threshold
+const WATER_MAX = 4;
+const WATER_FLOW = 0.45;
+const WATER_MIN = 0.02;
 function waterCanFlow(fx, fy, tx, ty) {
 	if (outOfRange(tx, ty)) return false;
 	const srcT = thisLevel[fy][fx];
 	const dstT = thisLevel[ty][tx];
 	const srcP = blockProperties[srcT] || null;
 	const dstP = blockProperties[dstT] || null;
-	// for some reason it cant but its fine
 	const dx = tx - fx, dy = ty - fy;
 	if (dy === 1) {
 		if (srcP && srcP[1]) return false;
@@ -3601,27 +3600,25 @@ function updateWaterPhysics() {
 	if (!waterGrid || waterGrid.length === 0) return;
 	_waterFlipFlop = !_waterFlipFlop;
 	for (let y = 0; y < levelHeight; y++) {
-		for (let x = 0; x < levelWidth; x++) {
-			if (thisLevel[y][x] === 130) waterGrid[y][x] = WATER_MAX;
-		}
-	}
-	for (let y = 0; y < levelHeight - 1; y++) {
 		const xStart = _waterFlipFlop ? 0 : levelWidth - 1;
 		const xEnd   = _waterFlipFlop ? levelWidth : -1;
 		const xStep  = _waterFlipFlop ? 1 : -1;
 		for (let x = xStart; x !== xEnd; x += xStep) {
+			if (thisLevel[y][x] === 130) waterGrid[y][x] = WATER_MAX;
 			let amt = waterGrid[y][x];
 			if (amt < WATER_MIN) { waterGrid[y][x] = 0; continue; }
-			if (thisLevel[y][x] === 130) continue;
-			if (waterCanFlow(x, y, x, y + 1) && waterGrid[y+1][x] < WATER_MAX) {
+			if (y < levelHeight - 1 && waterCanFlow(x, y, x, y + 1) && waterGrid[y+1][x] < WATER_MAX) {
 				const space = WATER_MAX - waterGrid[y+1][x];
 				const flow = Math.min(amt, space, WATER_FLOW * 2);
 				waterGrid[y][x]   -= flow;
 				waterGrid[y+1][x] += flow;
 				amt = waterGrid[y][x];
+				if (thisLevel[y][x] === 130) { waterGrid[y][x] = WATER_MAX; amt = WATER_MAX; }
 			}
+
 			if (amt < WATER_MIN) { waterGrid[y][x] = 0; continue; }
 			const tryHoriz = (tx) => {
+				if (tx < 0 || tx >= levelWidth) return;
 				if (!waterCanFlow(x, y, tx, y)) return;
 				const neighborAmt = waterGrid[y][tx];
 				if (neighborAmt >= amt) return;
@@ -3629,6 +3626,8 @@ function updateWaterPhysics() {
 				const flow = Math.min(diff, WATER_FLOW);
 				waterGrid[y][x]  -= flow;
 				waterGrid[y][tx] += flow;
+				amt = waterGrid[y][x];
+				if (thisLevel[y][x] === 130) { waterGrid[y][x] = WATER_MAX; amt = WATER_MAX; }
 			};
 			if (_waterFlipFlop) { tryHoriz(x - 1); tryHoriz(x + 1); }
 			else                { tryHoriz(x + 1); tryHoriz(x - 1); }
@@ -3638,18 +3637,16 @@ function updateWaterPhysics() {
 	}
 	for (let y = 0; y < levelHeight; y++) {
 		for (let x = 0; x < levelWidth; x++) {
-			if (thisLevel[y][x] === 130) continue;
+			if (thisLevel[y][x] === 130) { waterGrid[y][x] = WATER_MAX; continue; }
 			if (waterGrid[y][x] > 0 && !waterPassable(x, y)) waterGrid[y][x] = 0;
 			if (waterGrid[y][x] < WATER_MIN) waterGrid[y][x] = 0;
 		}
 	}
 }
-
 function drawWaterPhysics(context) {
 	if (!waterGrid || waterGrid.length === 0) return;
 	const TILE = 30;
 	context.save();
-
 	for (let y = 0; y < levelHeight; y++) {
 		for (let x = 0; x < levelWidth; x++) {
 			const amt = waterGrid[y][x];
@@ -3659,7 +3656,7 @@ function drawWaterPhysics(context) {
 			const fillH = TILE * fillFraction;
 			const fillY = y * TILE + (TILE - fillH);
 			const quarters = Math.floor(amt);
-			const partial  = amt - quarters; 
+			const partial  = amt - quarters;
 			const qDefs = [
 				[0, 1],
 				[1, 1],
@@ -3669,7 +3666,7 @@ function drawWaterPhysics(context) {
 
 			const baseX = x * TILE;
 			const baseY = y * TILE;
-			const QS = TILE / 2; 
+			const QS = TILE / 2;
 			const ripple = 0.05 * Math.sin((_frameCount * 0.15) + x * 0.7 + y * 1.1);
 			const alpha = 0.72 + ripple;
 			context.fillStyle = `rgba(30,120,220,${alpha.toFixed(3)})`;
@@ -3690,7 +3687,6 @@ function drawWaterPhysics(context) {
 
 	context.restore();
 }
-
 function drawLevel(context) {
 	context.drawImage(osc1, 0, 0, osc1.width / pixelRatio, osc1.height / pixelRatio);
 	for (let j = 0; j < tileDepths[1].length; j++) {
@@ -3701,11 +3697,9 @@ function drawLevel(context) {
 		addTileMovieClip(tileDepths[2][j].x, tileDepths[2][j].y, context);
 	}
 	drawCharacters(context);
-	// point1
 	for (let j = 0; j < tileDepths[3].length; j++) {
 		addTileMovieClip(tileDepths[3][j].x, tileDepths[3][j].y, context);
 	}
-	// point2
 	drawWaterPhysics(context);
 }
 
