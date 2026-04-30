@@ -3513,13 +3513,13 @@ function copyLevel(thatLevel) {
 	tileFrames = new Array(thatLevel.length);
 	tileShadows = new Array(thatLevel.length);
 	tileBorders = new Array(thatLevel.length);
-	waterGrid = new Array(thatLevel.length);
+	waterGrid = [];
 	for (let y = 0; y < levelHeight; y++) {
 		thisLevel[y] = new Array(thatLevel[y].length);
 		tileFrames[y] = new Array(thatLevel[y].length);
 		tileShadows[y] = new Array(thatLevel[y].length);
 		tileBorders[y] = new Array(thatLevel[y].length);
-		waterGrid[y] = new Array(thatLevel[y].length).fill(0);
+		waterGrid[y] = [];
 		for (let x = 0; x < levelWidth; x++) {
 			thisLevel[y][x] = thatLevel[y][x];
 			let bp = blockProperties[thisLevel[y][x]];
@@ -3527,7 +3527,7 @@ function copyLevel(thatLevel) {
 			tileFrames[y][x] = {cf: 0, playing: false, rotation: sw == 1 ? -60 : sw == 2 ? 60 : 0};
 			tileShadows[y][x] = [];
 			tileBorders[y][x] = [];
-			if (thisLevel[y][x] === 130) waterGrid[y][x] = 4;
+			waterGrid[y][x] = [false, false, false, false]; // TL, TR, BL, BR
 		}
 	}
 }
@@ -3561,132 +3561,159 @@ function drawLevelBG() {
 		(bgScale / 100) * cheight
 	);
 }
-const WATER_MAX = 4;
-const WATER_FLOW = 0.45;
-const WATER_MIN = 0.02;
-function waterCanFlow(fx, fy, tx, ty) {
-	if (outOfRange(tx, ty)) return false;
-	const srcT = thisLevel[fy][fx];
-	const dstT = thisLevel[ty][tx];
-	const srcP = blockProperties[srcT] || null;
-	const dstP = blockProperties[dstT] || null;
-	const dx = tx - fx, dy = ty - fy;
-	if (dy === 1) {
-		if (srcP && srcP[1]) return false;
-		if (dstP && dstP[0]) return false;
-	} else if (dy === -1) {
-		if (srcP && srcP[0]) return false;
-		if (dstP && dstP[1]) return false;
-	} else if (dx === 1) {
-		if (srcP && srcP[2]) return false;
-		if (dstP && dstP[3]) return false;
-	} else if (dx === -1) {
-		if (srcP && srcP[3]) return false;
-		if (dstP && dstP[2]) return false;
-	}
-	if (dstP && dstP[0] && dstP[1] && dstP[2] && dstP[3]) return false;
-	return true;
-}
-function waterPassable(x, y) {
-	if (outOfRange(x, y)) return false;
+const W_QS = 15;
+const W_COL = [0, 1, 0, 1];
+const W_ROW = [0, 0, 1, 1];
+function wIsPassable(x, y) {
+	if (x < 0 || y < 0 || x >= levelWidth || y >= levelHeight) return false;
 	const t = thisLevel[y][x];
 	const p = blockProperties[t];
 	if (!p) return true;
-	if (p[0] && p[1] && p[2] && p[3]) return false;
+	return !(p[0] && p[1] && p[2] && p[3]);
+}
+function wCanCross(fx, fy, tx, ty) {
+	if (!wIsPassable(tx, ty)) return false;
+	const sp = blockProperties[thisLevel[fy][fx]] || null;
+	const dp = blockProperties[thisLevel[ty][tx]] || null;
+	const dx = tx - fx, dy = ty - fy;
+	if (dy === 1)  { if (sp && sp[1]) return false; if (dp && dp[0]) return false; }
+	if (dy === -1) { if (sp && sp[0]) return false; if (dp && dp[1]) return false; }
+	if (dx === 1)  { if (sp && sp[2]) return false; if (dp && dp[3]) return false; }
+	if (dx === -1) { if (sp && sp[3]) return false; if (dp && dp[2]) return false; }
 	return true;
 }
-let _waterFlipFlop = false;
+function wHas(x, y, q) {
+	if (x < 0 || y < 0 || x >= levelWidth || y >= levelHeight) return false;
+	if (thisLevel[y][x] === 130) return true;
+	return waterGrid[y][x][q];
+}
+function wSet(x, y, q, v) {
+	if (x < 0 || y < 0 || x >= levelWidth || y >= levelHeight) return;
+	if (thisLevel[y][x] === 130) return;
+	waterGrid[y][x][q] = v;
+}
+let _wFlip = false;
 function updateWaterPhysics() {
-	if (!waterGrid || waterGrid.length === 0) return;
-	_waterFlipFlop = !_waterFlipFlop;
+	if (!waterGrid.length) return;
+	_wFlip = !_wFlip;
 	for (let y = 0; y < levelHeight; y++) {
-		const xStart = _waterFlipFlop ? 0 : levelWidth - 1;
-		const xEnd   = _waterFlipFlop ? levelWidth : -1;
-		const xStep  = _waterFlipFlop ? 1 : -1;
+		for (let x = 0; x < levelWidth; x++) {
+			if (thisLevel[y][x] !== 130) continue;
+			if (y + 1 < levelHeight && wCanCross(x, y, x, y + 1)) {
+				if (!waterGrid[y+1][x][0]) waterGrid[y+1][x][0] = true;
+				if (!waterGrid[y+1][x][1]) waterGrid[y+1][x][1] = true;
+			}
+			if (wCanCross(x, y, x - 1, y)) {
+				if (!waterGrid[y][x-1][1]) waterGrid[y][x-1][1] = true;
+				if (!waterGrid[y][x-1][3]) waterGrid[y][x-1][3] = true;
+			}
+			if (wCanCross(x, y, x + 1, y)) {
+				if (!waterGrid[y][x+1][0]) waterGrid[y][x+1][0] = true;
+				if (!waterGrid[y][x+1][2]) waterGrid[y][x+1][2] = true;
+			}
+		}
+	}
+	const qOrder = [2, 3, 0, 1]; // BL, BR, TL, TR
+
+	for (let y = 0; y < levelHeight; y++) {
+		const xStart = _wFlip ? 0 : levelWidth - 1;
+		const xEnd   = _wFlip ? levelWidth : -1;
+		const xStep  = _wFlip ? 1 : -1;
 		for (let x = xStart; x !== xEnd; x += xStep) {
-			if (thisLevel[y][x] === 130) waterGrid[y][x] = WATER_MAX;
-			let amt = waterGrid[y][x];
-			if (amt < WATER_MIN) { waterGrid[y][x] = 0; continue; }
-			if (y < levelHeight - 1 && waterCanFlow(x, y, x, y + 1) && waterGrid[y+1][x] < WATER_MAX) {
-				const space = WATER_MAX - waterGrid[y+1][x];
-				const flow = Math.min(amt, space, WATER_FLOW * 2);
-				waterGrid[y][x]   -= flow;
-				waterGrid[y+1][x] += flow;
-				amt = waterGrid[y][x];
-				if (thisLevel[y][x] === 130) { waterGrid[y][x] = WATER_MAX; amt = WATER_MAX; }
-			}
-
-			if (amt < WATER_MIN) { waterGrid[y][x] = 0; continue; }
-			const tryHoriz = (tx) => {
-				if (tx < 0 || tx >= levelWidth) return;
-				if (!waterCanFlow(x, y, tx, y)) return;
-				const neighborAmt = waterGrid[y][tx];
-				if (neighborAmt >= amt) return;
-				const diff = (amt - neighborAmt) / 2;
-				const flow = Math.min(diff, WATER_FLOW);
-				waterGrid[y][x]  -= flow;
-				waterGrid[y][tx] += flow;
-				amt = waterGrid[y][x];
-				if (thisLevel[y][x] === 130) { waterGrid[y][x] = WATER_MAX; amt = WATER_MAX; }
-			};
-			if (_waterFlipFlop) { tryHoriz(x - 1); tryHoriz(x + 1); }
-			else                { tryHoriz(x + 1); tryHoriz(x - 1); }
-
-			if (waterGrid[y][x] < WATER_MIN) waterGrid[y][x] = 0;
-		}
-	}
-	for (let y = 0; y < levelHeight; y++) {
-		for (let x = 0; x < levelWidth; x++) {
-			if (thisLevel[y][x] === 130) { waterGrid[y][x] = WATER_MAX; continue; }
-			if (waterGrid[y][x] > 0 && !waterPassable(x, y)) waterGrid[y][x] = 0;
-			if (waterGrid[y][x] < WATER_MIN) waterGrid[y][x] = 0;
-		}
-	}
-}
-function drawWaterPhysics(context) {
-	if (!waterGrid || waterGrid.length === 0) return;
-	const TILE = 30;
-	context.save();
-	for (let y = 0; y < levelHeight; y++) {
-		for (let x = 0; x < levelWidth; x++) {
-			const amt = waterGrid[y][x];
-			if (amt < WATER_MIN) continue;
 			if (thisLevel[y][x] === 130) continue;
-			const fillFraction = Math.min(amt / WATER_MAX, 1);
-			const fillH = TILE * fillFraction;
-			const fillY = y * TILE + (TILE - fillH);
-			const quarters = Math.floor(amt);
-			const partial  = amt - quarters;
-			const qDefs = [
-				[0, 1],
-				[1, 1],
-				[0, 0],
-				[1, 0],
-			];
+			for (const q of qOrder) {
+				if (!waterGrid[y][x][q]) continue;
 
-			const baseX = x * TILE;
-			const baseY = y * TILE;
-			const QS = TILE / 2;
-			const ripple = 0.05 * Math.sin((_frameCount * 0.15) + x * 0.7 + y * 1.1);
-			const alpha = 0.72 + ripple;
-			context.fillStyle = `rgba(30,120,220,${alpha.toFixed(3)})`;
-			for (let q = 0; q < Math.min(quarters, 4); q++) {
-				const [qc, qr] = qDefs[q];
-				context.fillRect(baseX + qc * QS, baseY + qr * QS, QS, QS);
+				const col = W_COL[q];
+				const row = W_ROW[q];
+				let moved = false;
+
+				if (row === 1) {
+					const targetQ_same = col;
+					if (wCanCross(x, y, x, y + 1) && !wHas(x, y + 1, targetQ_same)) {
+						wSet(x, y, q, false);
+						wSet(x, y + 1, targetQ_same, true);
+						moved = true;
+					} else if (wCanCross(x, y, x, y + 1) && !wHas(x, y + 1, col + 2)) {
+						wSet(x, y, q, false);
+						wSet(x, y + 1, col + 2, true);
+						moved = true;
+					}
+				} else {
+					const belowQ = q + 2;
+					if (!wHas(x, y, belowQ)) {
+						wSet(x, y, q, false);
+						wSet(x, y, belowQ, true);
+						moved = true;
+					} else if (wCanCross(x, y, x, y + 1) && !wHas(x, y + 1, q)) {
+						wSet(x, y, q, false);
+						wSet(x, y + 1, q, true);
+						moved = true;
+					}
+				}
+
+				if (moved) continue;
+				const dirs = _wFlip ? [-1, 1] : [1, -1];
+				for (const dx of dirs) {
+					const nx = x + dx;
+					if (nx < 0 || nx >= levelWidth) continue;
+					if (!wCanCross(x, y, nx, y)) continue;
+					const nCol = dx === -1 ? 0 : 1;
+					const nQ = nCol + row * 2;
+					if (!wHas(nx, y, nQ)) {
+						wSet(x, y, q, false);
+						wSet(nx, y, nQ, true);
+						moved = true;
+						break;
+					}
+					const nQ2 = nCol + (1 - row) * 2;
+					if (row === 0 && !wHas(nx, y, nQ2)) { 
+						wSet(x, y, q, false);
+						wSet(nx, y, nQ2, true);
+						moved = true;
+						break;
+					}
+				}
 			}
-			if (quarters < 4 && partial > 0.001) {
-				const [qc, qr] = qDefs[quarters];
-				const partH = QS * partial;
-				context.fillRect(baseX + qc * QS, baseY + qr * QS + (QS - partH), QS, partH);
-			}
-			const surfaceY = baseY + qDefs[Math.min(quarters, 3)][1] * QS + (quarters < 4 ? QS * (1 - partial) : 0);
-			context.fillStyle = `rgba(180,220,255,0.18)`;
-			context.fillRect(baseX, surfaceY, TILE, 2);
 		}
 	}
-
-	context.restore();
+	for (let y = 0; y < levelHeight; y++) {
+		for (let x = 0; x < levelWidth; x++) {
+			if (thisLevel[y][x] === 130) continue;
+			if (!wIsPassable(x, y)) {
+				waterGrid[y][x][0] = waterGrid[y][x][1] = waterGrid[y][x][2] = waterGrid[y][x][3] = false;
+			}
+		}
+	}
 }
+
+function drawWaterCells(context) {
+	if (!waterGrid.length || !svgTiles[130]) return;
+	const img = svgTiles[130];
+	const sf = scaleFactor;
+	const vb = svgTilesVB[130];
+	const iw = img.width, ih = img.height;
+	const hw = iw / 2, hh = ih / 2; 
+
+	for (let y = 0; y < levelHeight; y++) {
+		for (let x = 0; x < levelWidth; x++) {
+			if (thisLevel[y][x] === 130) continue;
+			const cell = waterGrid[y][x];
+			if (!cell[0] && !cell[1] && !cell[2] && !cell[3]) continue;
+			const bx = x * 30 + vb[0];
+			const by = y * 30 + vb[1];
+			for (let q = 0; q < 4; q++) {
+				if (!cell[q]) continue;
+				const srcX = W_COL[q] * hw;
+				const srcY = W_ROW[q] * hh;
+				const dstX = bx + W_COL[q] * W_QS;
+				const dstY = by + W_ROW[q] * W_QS;
+				context.drawImage(img, srcX, srcY, hw, hh, dstX, dstY, W_QS, W_QS);
+			}
+		}
+	}
+}
+
 function drawLevel(context) {
 	context.drawImage(osc1, 0, 0, osc1.width / pixelRatio, osc1.height / pixelRatio);
 	for (let j = 0; j < tileDepths[1].length; j++) {
@@ -3700,7 +3727,7 @@ function drawLevel(context) {
 	for (let j = 0; j < tileDepths[3].length; j++) {
 		addTileMovieClip(tileDepths[3][j].x, tileDepths[3][j].y, context);
 	}
-	drawWaterPhysics(context);
+	drawWaterCells(context);
 }
 
 function drawCharacters(context) {
@@ -4696,13 +4723,15 @@ function somewhereSubmerged(i) {
 		let lowY = Math.floor((char[i].y - char[i].h) / 30);
 		let highY = Math.floor(char[i].y / 30);
 		for (let y = lowY; y <= highY; y++) {
-			if (!outOfRange(x, y) && (blockProperties[thisLevel[y][x]][14] || (waterGrid[y] && waterGrid[y][x] >= 2))) {
-				if (y == highY) {
-					if (record == 0) {
-						record = 2;
+			if (!outOfRange(x, y)) {
+				const isLiquidTile = blockProperties[thisLevel[y][x]][14];
+				const hasWater = isLiquidTile || (waterGrid[y] && (waterGrid[y][x][0] || waterGrid[y][x][1] || waterGrid[y][x][2] || waterGrid[y][x][3]));
+				if (hasWater) {
+					if (y == highY) {
+						if (record == 0) record = 2;
+					} else {
+						record = 3;
 					}
-				} else {
-					record = 3;
 				}
 			}
 		}
