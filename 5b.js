@@ -10892,26 +10892,27 @@ let then = window.performance.now();
 let lastFrameReq = then;
 let interval = 1000 / fps;
 let delta;
-
 function rAF60fps() {
-const slider = document.getElementById('ssslider');
+	const slider = document.getElementById('ssslider');
 const sslider = document.getElementById('sssval');
 const sweight = document.getElementById('ssweight');
 const ssweight = document.getElementById('weightval');
+
 slider.addEventListener('input', function() {
     allxspeed = parseFloat(this.value);
     sslider.textContent = this.value;
     for (let i = 0; i < charD.length; i++) {
         charD[i][4] = allxspeed;
     }
-}
+});
+
 sweight.addEventListener('input', function() {
     allxsweight = parseFloat(this.value);
     ssweight.textContent = this.value;
     for (let i = 0; i < charD.length; i++) {
         charD[i][2] = allxsweight;
     }
-}
+});
 	requestAnimationFrame(rAF60fps);
 	if (frameRateThrottling) {
 		now = window.performance.now();
