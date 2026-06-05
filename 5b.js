@@ -10904,13 +10904,14 @@ slider.addEventListener('input', function() {
     for (let i = 0; i < charD.length; i++) {
         charD[i][4] = allxspeed;
     }
+}
 sweight.addEventListener('input', function() {
     allxsweight = parseFloat(this.value);
     ssweight.textContent = this.value;
     for (let i = 0; i < charD.length; i++) {
         charD[i][2] = allxsweight;
     }
-});
+}
 	requestAnimationFrame(rAF60fps);
 	if (frameRateThrottling) {
 		now = window.performance.now();
