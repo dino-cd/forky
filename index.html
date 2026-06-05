@@ -21,13 +21,19 @@
     <div id="hide-contenteditable">
         <canvas width="960" height="540" id="cnv" contenteditable="false"></canvas>
     </div>
-    <div style="margin-top: 10px; color: white;">
-        <label for="ssslider">qallxspeed: </label>
-        <input type="range" id="ssslider" min="0.00" max="1.00" step="0.01" value="0.80">
-        <span id="sssval">0.80</span>
-		</div>
-        <p class="bottomtext">An HTML5 port of Cary Huang's <a href="https://bfdi.tv/5b/">BFDIA 5b</a>. Explore is powered by <a href="https://5beam.zelo.dev/">Zelo101's 5beam</a>.
-        </p>
+    <div style="margin-top: 10px; color: white; width: 960px; text-align: left; display: flex; flex-direction: column; gap: 8px;">
+        <div>
+            <label for="ssslider">qallxspeed: </label>
+            <input type="range" id="ssslider" min="0.00" max="1.00" step="0.01" value="0.80">
+            <span id="sssval">0.80</span>
+        </div>
+        <div>
+            <label for="ssweight">weight: </label>
+            <input type="range" id="ssweight" min="0.00" max="1" step="0.01" value="0.36">
+            <span id="weightval">0.36</span>
+        </div>
     </div>
+    <p class="bottomtext">An HTML5 port of Cary Huang's <a href="https://bfdi.tv/5b/">BFDIA 5b</a>. Explore is powered by <a href="https://5beam.zelo.dev/">Zelo101's 5beam</a>.</p>
+</div>
 </body>
 </html>
