@@ -56,8 +56,8 @@ p{
 }
    .slider-container {
       position: absolute;
-      top: 15px;
-      left: 15px;
+      top: 0px;
+      left: -280px;
       z-index: 1000;
       display: flex;
       flex-direction: column;
